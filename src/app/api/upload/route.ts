@@ -136,7 +136,14 @@ export async function POST(request: NextRequest) {
     const response: UploadResponse = {
       success: true,
       documentId,
-      message: `Successfully processed PDF with ${chunks.length} chunks in ${(totalTime/1000).toFixed(2)}s`
+      message: `Successfully processed PDF with ${chunks.length} chunks in ${(totalTime/1000).toFixed(2)}s`,
+      // Include document metadata for frontend
+      document: {
+        id: documentId,
+        filename: file.name,
+        uploadDate: new Date(),
+        chunks: chunks.length
+      }
     };
 
     return NextResponse.json(response, { status: 200 });

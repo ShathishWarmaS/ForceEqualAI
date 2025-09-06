@@ -35,4 +35,10 @@ export interface UploadResponse {
   success: boolean;
   documentId?: string;
   message: string;
+  document?: {
+    id: string;
+    filename: string;
+    uploadDate: Date;
+    chunks: number;
+  };
 }

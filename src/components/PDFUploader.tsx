@@ -157,12 +157,22 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
         setUploadProgress(100);
         setUploadPhase('complete');
         
+        // Store document metadata in localStorage
+        if (data.document) {
+          const storedDocs = localStorage.getItem('uploadedDocuments');
+          const documents = storedDocs ? JSON.parse(storedDocs) : [];
+          documents.push(data.document);
+          localStorage.setItem('uploadedDocuments', JSON.stringify(documents));
+        }
+        
         setTimeout(() => {
           setUploadStatus({
             type: 'success',
             message: data.message,
           });
           onUploadSuccess(data.documentId);
+          // Dispatch event to refresh document list
+          window.dispatchEvent(new CustomEvent('documentsUpdated'));
         }, 500);
       } else {
         // Other errors

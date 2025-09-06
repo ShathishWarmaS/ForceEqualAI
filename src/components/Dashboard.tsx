@@ -13,7 +13,7 @@ import FuturisticBackground from './FuturisticBackground';
 export default function Dashboard() {
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
   const [currentDocumentName, setCurrentDocumentName] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'upload' | 'chat' | 'documents'>('upload');
+  const [activeView, setActiveView] = useState<'chat' | 'documents'>('documents');
   const [documents, setDocuments] = useState<any[]>([]);
   const { user, logout } = useAuth();
   const { currentSession, createSession } = useChat();
@@ -25,8 +25,11 @@ export default function Dashboard() {
       try {
         const docs = JSON.parse(storedDocs);
         setDocuments(docs);
-        if (docs.length > 0 && !currentDocumentId) {
+        // Default to documents view if we have documents, otherwise show chat
+        if (docs.length > 0) {
           setActiveView('documents');
+        } else {
+          setActiveView('chat');
         }
       } catch (error) {
         console.error('Error loading documents:', error);
@@ -66,22 +69,20 @@ export default function Dashboard() {
 
   const handleNewChat = () => {
     const session = createSession(currentDocumentId || undefined, currentDocumentName || undefined);
-    if (!currentDocumentId) {
-      setActiveView('upload');
-    }
+    setActiveView('chat');
   };
 
   const handleNewUpload = () => {
     setCurrentDocumentId(null);
     setCurrentDocumentName(null);
-    setActiveView('upload');
+    // Stay on current view, upload is always available in main area
   };
 
   return (
-    <div className="min-h-screen flex relative neural-bg">
+    <div className="min-h-screen flex relative neural-bg container-constrained">
       <FuturisticBackground />
       {/* Sidebar */}
-      <div className="w-80 card-futuristic border-r border-cyan-500/20 flex flex-col h-screen backdrop-blur-xl z-10">
+      <div className="sidebar-content card-futuristic border-r border-cyan-500/20 flex flex-col h-screen backdrop-blur-xl z-10 overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-cyan-500/20">
           <div className="flex items-center justify-between">
@@ -129,17 +130,6 @@ export default function Dashboard() {
               <FileText className="h-4 w-4 mr-2" />
               Documents
             </button>
-            <button
-              onClick={() => setActiveView('upload')}
-              className={`flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                activeView === 'upload'
-                  ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 border border-green-500/30 shadow-lg shadow-green-500/20'
-                  : 'text-slate-400 hover:text-green-400 hover:bg-white/5 border border-transparent'
-              }`}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </button>
           </div>
         </div>
 
@@ -152,24 +142,12 @@ export default function Dashboard() {
               onDocumentSelect={handleDocumentSelect}
             />
           )}
-          {activeView === 'upload' && (
-            <div className="p-6 text-center">
-              <div className="relative">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-green-400 float" />
-                <div className="absolute inset-0 h-12 w-12 mx-auto rounded-full bg-green-400/20 blur-xl"></div>
-              </div>
-              <h3 className="text-sm font-medium text-white mb-2">Upload PDF</h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Use the main area to upload a new PDF document
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-screen z-10">
-        {activeView === 'upload' ? (
+      <div className="main-content flex flex-col h-screen z-10 overflow-hidden relative">
+        {!currentDocumentId ? (
           /* Upload Screen */
           <div className="flex-1 flex items-center justify-center p-8 relative">
             <div className="text-center max-w-2xl relative z-10">
@@ -242,18 +220,12 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-white">
-                    {currentDocumentName ? (
-                      <span className="text-holographic">
-                        Chatting with {currentDocumentName}
-                      </span>
-                    ) : (
-                      <span className="text-holographic">AI Assistant</span>
-                    )}
+                    <span className="text-holographic">
+                      Chatting with {currentDocumentName}
+                    </span>
                   </h2>
                   <p className="text-sm text-slate-400 mt-1">
-                    {currentDocumentName 
-                      ? 'Ask questions about your document content' 
-                      : 'Upload a document to get started'}
+                    Ask questions about your document content
                   </p>
                 </div>
                 <button
