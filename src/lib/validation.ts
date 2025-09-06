@@ -11,7 +11,11 @@ export const chatSchema = z.object({
     .min(1, 'Question cannot be empty')
     .max(1000, 'Question is too long (max 1000 characters)')
     .refine((val) => val.trim().length > 0, 'Question cannot be only whitespace'),
-  documentId: z.string().uuid('Invalid document ID')
+  documentId: z.string().uuid('Invalid document ID').nullable().optional(),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string()
+  })).optional()
 });
 
 export const fileUploadSchema = z.object({

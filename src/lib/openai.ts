@@ -22,24 +22,45 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 }
 
-export async function generateAnswer(query: string, context: string): Promise<string> {
+export async function generateAnswer(
+  query: string, 
+  context: string,
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string> {
   try {
+    // Build messages array with system prompt
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      {
+        role: 'system',
+        content: `You are a helpful assistant that answers questions based on the provided PDF content. 
+                 Use the conversation history to maintain context and provide relevant follow-up answers.
+                 Use only the information from the context provided. If the answer cannot be found in the context, 
+                 say "I cannot find information about that in the provided document."
+                 Be conversational and reference previous parts of the conversation when relevant.`
+      }
+    ];
+
+    // Add conversation history if provided (excluding the current question)
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Add historical messages (but not the latest user message which is the current query)
+      const historyMessages = conversationHistory.slice(0, -1);
+      messages.push(...historyMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })));
+    }
+
+    // Add current context and question
+    messages.push({
+      role: 'user',
+      content: `Context from document: ${context}\n\nQuestion: ${query}`
+    });
+
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a helpful assistant that answers questions based on the provided PDF content. 
-                   Use only the information from the context provided. If the answer cannot be found in the context, 
-                   say "I cannot find information about that in the provided document."`
-        },
-        {
-          role: 'user',
-          content: `Context: ${context}\n\nQuestion: ${query}`
-        }
-      ],
+      messages,
       temperature: 0.3,
-      max_tokens: 500,
+      max_tokens: 800, // Increased for conversational responses
     });
     
     return response.choices[0].message.content || 'Sorry, I could not generate an answer.';

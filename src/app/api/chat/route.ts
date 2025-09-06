@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Validate input with Zod schema
     const validatedData = chatSchema.parse(requestBody);
-    const { question, documentId } = validatedData;
+    const { question, documentId, conversationHistory } = validatedData;
 
     // Additional sanitization
     const sanitizedQuestion = sanitizeText(question);
@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
       .map(chunk => chunk.content)
       .join('\n\n');
     
-    // Generate answer using OpenAI
-    const answer = await generateAnswer(sanitizedQuestion, context);
+    // Generate answer using OpenAI with conversation history
+    const answer = await generateAnswer(sanitizedQuestion, context, conversationHistory);
     
     // Calculate confidence based on number of relevant chunks found
     const confidence = Math.min(similarChunks.length / 3, 1.0);

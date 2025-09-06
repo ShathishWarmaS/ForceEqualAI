@@ -22,13 +22,22 @@ export function LoadingSpinner({
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <div className="flex flex-col items-center space-y-2">
-        <div 
-          className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 ${sizeClasses[size]}`}
-          role="status"
-          aria-label="Loading"
-        />
+        <div className="relative">
+          <div 
+            className={`animate-spin rounded-full border-2 border-transparent bg-gradient-to-r from-cyan-400 to-blue-500 ${sizeClasses[size]}`}
+            style={{
+              background: 'conic-gradient(from 0deg, #00d4ff, #667eea, #764ba2, #f093fb, #00d4ff)',
+              borderRadius: '50%'
+            }}
+            role="status"
+            aria-label="Loading"
+          />
+          <div 
+            className={`absolute inset-0.5 rounded-full bg-gray-900 ${sizeClasses[size]}`}
+          />
+        </div>
         {text && (
-          <p className="text-sm text-gray-600 font-medium">
+          <p className="text-sm text-slate-300 font-medium">
             {text}
           </p>
         )}
@@ -49,20 +58,26 @@ export function ProgressBar({
   return (
     <div className={`w-full ${className}`}>
       {text && (
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700">{text}</span>
-          <span className="text-sm text-gray-500">{Math.round(progress)}%</span>
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-sm font-medium text-white">{text}</span>
+          <span className="text-sm text-cyan-400 font-mono">{Math.round(progress)}%</span>
         </div>
       )}
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="w-full bg-white/10 rounded-full h-3 border border-cyan-500/30 overflow-hidden">
         <div 
-          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
-          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          className="h-full rounded-full transition-all duration-500 ease-out relative"
+          style={{ 
+            width: `${Math.min(100, Math.max(0, progress))}%`,
+            background: 'linear-gradient(90deg, #00d4ff, #667eea, #764ba2)',
+            boxShadow: '0 0 10px rgba(0, 212, 255, 0.5)'
+          }}
           role="progressbar"
           aria-valuenow={progress}
           aria-valuemin={0}
           aria-valuemax={100}
-        />
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+        </div>
       </div>
     </div>
   );

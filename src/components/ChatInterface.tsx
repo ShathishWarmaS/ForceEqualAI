@@ -1,52 +1,73 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Send, Bot, User, BookOpen, AlertCircle } from 'lucide-react';
-import { ChatMessage, QAResponse } from '@/types';
+import { Send, Bot, User, Copy, ThumbsUp, ThumbsDown, RefreshCw, Sparkles } from 'lucide-react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface ChatInterfaceProps {
-  documentId: string;
+  documentId?: string;
+  documentName?: string;
 }
 
-export default function ChatInterface({ documentId }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState('');
+export default function ChatInterface({ documentId, documentName }: ChatInterfaceProps) {
+  const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { currentSession, addMessage, createSession } = useChat();
   const { token } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Auto-scroll to bottom when new messages are added
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentSession?.messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [question]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!currentQuestion.trim() || isLoading) {
-      return;
-    }
+    if (!question.trim() || isLoading) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: currentQuestion.trim(),
-      timestamp: new Date(),
-      documentId,
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setCurrentQuestion('');
+    const trimmedQuestion = question.trim();
+    setQuestion('');
     setIsLoading(true);
-    setError('');
 
     try {
+      // Create new session if none exists
+      let session = currentSession;
+      if (!session) {
+        session = createSession(documentId, documentName);
+      }
+
+      // Add user message
+      addMessage({
+        role: 'user',
+        content: trimmedQuestion,
+        documentId,
+        documentName
+      });
+
+      // Get conversation history for context
+      const conversationHistory = session.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Add current question to history
+      conversationHistory.push({
+        role: 'user',
+        content: trimmedQuestion
+      });
+
+      // Call API with conversation history
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -54,135 +75,219 @@ export default function ChatInterface({ documentId }: ChatInterfaceProps) {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          question: userMessage.content,
-          documentId,
+          question: trimmedQuestion,
+          documentId: documentId || null,
+          conversationHistory: conversationHistory.slice(-10) // Keep last 10 messages for context
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to get response');
+      const data = await response.json();
+
+      if (data.success) {
+        // Add AI response
+        addMessage({
+          role: 'assistant',
+          content: data.answer,
+          documentId,
+          documentName
+        });
+      } else {
+        // Add error message
+        addMessage({
+          role: 'assistant',
+          content: `I'm sorry, I encountered an error: ${data.error || 'Unable to process your question'}`,
+          documentId,
+          documentName
+        });
       }
-
-      const data: QAResponse = await response.json();
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.answer,
-        timestamp: new Date(),
-        documentId,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
     } catch (error) {
       console.error('Chat error:', error);
-      setError('Failed to get response. Please try again.');
-      
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+      addMessage({
         role: 'assistant',
-        content: 'Sorry, I encountered an error while processing your question. Please try again.',
-        timestamp: new Date(),
+        content: "I'm sorry, I encountered a network error. Please check your connection and try again.",
         documentId,
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
+        documentName
+      });
+    } finally {
+      setIsLoading(false);
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
+  };
+
+  const copyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+  };
+
+  const regenerateResponse = async (messageIndex: number) => {
+    if (!currentSession || messageIndex <= 0) return;
+    
+    const previousMessage = currentSession.messages[messageIndex - 1];
+    if (previousMessage.role !== 'user') return;
+
+    setIsLoading(true);
+    
+    try {
+      // Get conversation history up to the message we're regenerating
+      const conversationHistory = currentSession.messages.slice(0, messageIndex).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          question: previousMessage.content,
+          documentId: documentId || null,
+          conversationHistory: conversationHistory.slice(-10)
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update the message in place
+        const updatedSession = {
+          ...currentSession,
+          messages: currentSession.messages.map((msg, idx) => 
+            idx === messageIndex 
+              ? { ...msg, content: data.answer, timestamp: new Date() }
+              : msg
+          ),
+          updatedAt: new Date()
+        };
+        // Note: This would need to be handled by the ChatContext
+      }
+    } catch (error) {
+      console.error('Regenerate error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm border">
-      {/* Header */}
-      <div className="p-4 border-b bg-gray-50 rounded-t-lg">
-        <div className="flex items-center">
-          <BookOpen className="h-5 w-5 text-blue-600 mr-2" />
-          <h2 className="text-lg font-semibold text-gray-900">
-            Ask questions about your PDF
-          </h2>
-        </div>
-        <p className="text-sm text-gray-600 mt-1">
-          The AI will answer based on the content of your uploaded document.
-        </p>
-      </div>
-
+    <div className="flex flex-col h-full bg-transparent">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-        {messages.length === 0 && (
-          <div className="text-center py-8">
-            <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">
-              Start by asking a question about your PDF
-            </p>
-            <p className="text-gray-400 text-sm mt-2">
-              Example: "What is the main topic of this document?"
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {!currentSession || currentSession.messages.length === 0 ? (
+          <div className="text-center mt-12">
+            <div className="relative mb-6">
+              <Bot className="h-20 w-20 mx-auto text-cyan-400 float" />
+              <div className="absolute inset-0 h-20 w-20 mx-auto rounded-full bg-cyan-400/20 blur-xl"></div>
+              <Sparkles className="h-6 w-6 absolute -top-2 -right-2 text-purple-400 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-medium text-white mb-4 text-holographic">
+              {documentName ? `Ask questions about ${documentName}` : 'Start a conversation'}
+            </h3>
+            <p className="text-slate-400">
+              {documentName 
+                ? 'I can help you understand and analyze the content of your document.' 
+                : 'Upload a document or ask me anything!'}
             </p>
           </div>
-        )}
-
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`flex max-w-[80%] ${
-                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}
-            >
-              <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white ml-2'
-                    : 'bg-gray-200 text-gray-600 mr-2'
-                }`}
-              >
+        ) : (
+          currentSession.messages.map((message, index) => (
+            <div key={message.id} className="flex space-x-4 group">
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                message.role === 'user' 
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-400/50 shadow-lg shadow-cyan-500/25' 
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-400/50 shadow-lg shadow-purple-500/25'
+              } transition-all duration-300 group-hover:scale-110`}>
                 {message.role === 'user' ? (
-                  <User className="h-4 w-4" />
+                  <User className="h-5 w-5 text-white" />
                 ) : (
-                  <Bot className="h-4 w-4" />
+                  <Bot className="h-5 w-5 text-white" />
                 )}
               </div>
-              <div
-                className={`rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p
-                  className={`text-xs mt-1 opacity-70 ${
-                    message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                  }`}
-                >
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
+              
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-white">
+                    {message.role === 'user' ? 'You' : 'AI Assistant'}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {message.timestamp.toLocaleTimeString([], { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                </div>
+                
+                <div className={`card-futuristic p-4 ${
+                  message.role === 'user' 
+                    ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/10' 
+                    : 'border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10'
+                }`}>
+                  <p className="text-white whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                </div>
+                
+                {/* Message actions */}
+                <div className="flex items-center space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    onClick={() => copyMessage(message.content)}
+                    className="text-xs text-slate-400 hover:text-cyan-400 flex items-center space-x-1 transition-colors duration-200"
+                  >
+                    <Copy className="h-3 w-3" />
+                    <span>Copy</span>
+                  </button>
+                  
+                  {message.role === 'assistant' && (
+                    <>
+                      <button
+                        onClick={() => regenerateResponse(index)}
+                        disabled={isLoading}
+                        className="text-xs text-slate-400 hover:text-purple-400 flex items-center space-x-1 disabled:opacity-50 transition-colors duration-200"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Regenerate</span>
+                      </button>
+                      
+                      <button className="text-xs text-slate-400 hover:text-green-400 flex items-center space-x-1 transition-colors duration-200">
+                        <ThumbsUp className="h-3 w-3" />
+                      </button>
+                      
+                      <button className="text-xs text-slate-400 hover:text-red-400 flex items-center space-x-1 transition-colors duration-200">
+                        <ThumbsDown className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-
+          ))
+        )}
+        
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-600 mr-2 flex items-center justify-center">
-                <Bot className="h-4 w-4" />
+          <div className="flex space-x-4 group">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 border-2 border-purple-400/50 shadow-lg shadow-purple-500/25 flex items-center justify-center pulse-glow">
+              <Bot className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-white">AI Assistant</span>
+                <div className="typing-dots">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
               </div>
-              <div className="bg-gray-100 rounded-lg px-4 py-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="card-futuristic border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4">
+                <div className="flex items-center space-x-3">
+                  <LoadingSpinner size="sm" />
+                  <span className="text-sm text-slate-300">Processing your question...</span>
                 </div>
               </div>
             </div>
@@ -192,35 +297,47 @@ export default function ChatInterface({ documentId }: ChatInterfaceProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="p-4 border-t bg-red-50 flex items-center text-red-800">
-          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
-
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex space-x-2">
-          <textarea
-            value={currentQuestion}
-            onChange={(e) => setCurrentQuestion(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask a question about your PDF..."
-            rows={1}
-            className="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={isLoading}
-          />
+      <div className="border-t border-cyan-500/20 p-6 backdrop-blur-xl">
+        <form onSubmit={handleSubmit} className="flex space-x-4">
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={documentName ? `Ask a question about ${documentName}...` : "Ask me anything..."}
+              disabled={isLoading}
+              className="w-full px-4 py-3 card-futuristic border border-cyan-500/30 rounded-lg resize-none focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/25 disabled:opacity-50 disabled:cursor-not-allowed text-white placeholder-slate-400 transition-all duration-300"
+              rows={1}
+              style={{ minHeight: '48px', maxHeight: '120px' }}
+            />
+            <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 pointer-events-none opacity-0 focus-within:opacity-100 transition-opacity duration-300"></div>
+          </div>
+          
           <button
             type="submit"
-            disabled={!currentQuestion.trim() || isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            disabled={!question.trim() || isLoading}
+            className="btn-futuristic disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[50px]"
           >
-            <Send className="h-4 w-4" />
+            {isLoading ? (
+              <div className="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </button>
-        </div>
-      </form>
+        </form>
+        
+        {documentName && (
+          <div className="mt-3 text-xs text-slate-400 text-center">
+            Currently chatting about: <span className="text-cyan-400 font-medium">{documentName}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

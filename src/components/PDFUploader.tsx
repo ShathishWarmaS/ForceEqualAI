@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, FileText, AlertCircle, CheckCircle, Shield, Clock } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, Shield, Clock, Zap } from 'lucide-react';
 import { ErrorMessage, SuccessMessage } from './ErrorMessage';
 import { LoadingSpinner, ProgressBar } from './LoadingSpinner';
 
@@ -193,10 +193,10 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div
-        className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
+        className={`relative border-2 border-dashed rounded-xl p-8 transition-all duration-500 group ${
           dragActive
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 bg-white hover:bg-gray-50'
+            ? 'border-cyan-400 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 shadow-2xl shadow-cyan-500/25 scale-105'
+            : 'border-cyan-500/30 card-futuristic hover:border-cyan-400 hover:shadow-xl hover:shadow-cyan-500/20 hover:scale-102'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -212,20 +212,22 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
           disabled={isUploading}
         />
         
-        <div className="text-center">
+        <div className="text-center relative">
           {isUploading ? (
-            <div className="flex flex-col items-center space-y-4">
-              <div className="flex items-center space-x-2">
-                {uploadPhase === 'uploading' && <Upload className="h-5 w-5 text-blue-600" />}
-                {uploadPhase === 'processing' && <Shield className="h-5 w-5 text-blue-600" />}
-                {uploadPhase === 'complete' && <CheckCircle className="h-5 w-5 text-green-600" />}
-                <LoadingSpinner size="sm" />
+            <div className="flex flex-col items-center space-y-6">
+              <div className="relative">
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 animate-pulse">
+                  {uploadPhase === 'uploading' && <Upload className="h-8 w-8 text-white" />}
+                  {uploadPhase === 'processing' && <Zap className="h-8 w-8 text-white" />}
+                  {uploadPhase === 'complete' && <CheckCircle className="h-8 w-8 text-white" />}
+                </div>
+                <div className="absolute inset-0 rounded-full bg-cyan-400/30 blur-xl animate-pulse"></div>
               </div>
               
               {fileInfo && (
-                <div className="text-xs text-gray-500">
-                  <p className="font-medium">{fileInfo.name}</p>
-                  <p>{(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
+                <div className="card-futuristic p-3 border-cyan-500/30">
+                  <p className="text-sm font-medium text-white">{fileInfo.name}</p>
+                  <p className="text-xs text-cyan-400">{(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
               )}
 
@@ -240,24 +242,27 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
               />
               
               {uploadPhase === 'processing' && (
-                <div className="flex items-center text-xs text-gray-600">
-                  <Clock className="h-3 w-3 mr-1" />
+                <div className="flex items-center text-xs text-slate-300">
+                  <Clock className="h-3 w-3 mr-1 text-cyan-400" />
                   <span>Extracting text and generating embeddings...</span>
                 </div>
               )}
             </div>
           ) : (
             <>
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+              <div className="relative mb-6">
+                <Upload className="mx-auto h-16 w-16 text-cyan-400 float group-hover:scale-110 transition-transform" />
+                <div className="absolute inset-0 h-16 w-16 mx-auto rounded-full bg-cyan-400/20 blur-xl group-hover:bg-cyan-400/30"></div>
+              </div>
+              <p className="text-xl font-bold text-white mb-2 text-holographic">
                 Upload your PDF
               </p>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-slate-300 mb-6">
                 Drag and drop a PDF file here, or click to browse
               </p>
               <button
                 type="button"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-futuristic disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
               >
@@ -265,8 +270,8 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
                 Choose File
               </button>
               
-              <div className="mt-4 flex items-center justify-center text-xs text-gray-500">
-                <Shield className="h-3 w-3 mr-1" />
+              <div className="mt-6 flex items-center justify-center text-xs text-slate-400">
+                <Shield className="h-3 w-3 mr-1 text-green-400" />
                 <span>Files are processed securely and not stored permanently</span>
               </div>
             </>
@@ -297,11 +302,27 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
         </div>
       )}
 
-      <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
-        <p>• Supported format: PDF only</p>
-        <p>• Maximum file size: 10MB</p>
-        <p>• Files are validated for security</p>
-        <p>• Processing time: ~10-30 seconds per MB</p>
+      <div className="mt-6 text-xs text-slate-400 text-center space-y-2">
+        <div className="flex items-center justify-center space-x-4">
+          <div className="flex items-center space-x-1">
+            <FileText className="h-3 w-3 text-blue-400" />
+            <span>PDF only</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Shield className="h-3 w-3 text-green-400" />
+            <span>10MB max</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-center space-x-4">
+          <div className="flex items-center space-x-1">
+            <Zap className="h-3 w-3 text-purple-400" />
+            <span>Security validated</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Clock className="h-3 w-3 text-cyan-400" />
+            <span>~10-30s per MB</span>
+          </div>
+        </div>
       </div>
     </div>
   );
