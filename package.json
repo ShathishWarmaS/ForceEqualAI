@@ -1,6 +1,23 @@
 {
-  "name": "pdf-qa-app",
-  "version": "0.1.0",
+  "name": "advanced-rag-2025-pdf-qa",
+  "version": "2.0.0",
+  "description": "Enterprise-grade PDF Question-Answering system powered by Adaptive Retrieval-Augmented Generation (RAG) 2025 with AI-driven strategy selection",
+  "author": "Shathishwarma S",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShathishWarmaS/ForceEqualAI.git"
+  },
+  "keywords": [
+    "RAG",
+    "PDF",
+    "AI",
+    "Next.js",
+    "OpenAI",
+    "Adaptive Retrieval",
+    "Knowledge Graph",
+    "Multi-stage Retrieval",
+    "Enterprise"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev",
