@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function FuturisticBackground() {
+  const { isDarkMode } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -11,6 +13,17 @@ export default function FuturisticBackground() {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Theme-aware colors
+    const colors = isDarkMode ? {
+      bg: 'rgba(10, 10, 11, 0.1)',
+      primary: '0, 212, 255',
+      secondary: '102, 126, 234'
+    } : {
+      bg: 'rgba(248, 250, 252, 0.1)',
+      primary: '15, 23, 42',      // Dark slate for light mode
+      secondary: '30, 64, 175'    // Dark blue for light mode
+    };
 
     // Set canvas size
     const resizeCanvas = () => {
@@ -60,7 +73,7 @@ export default function FuturisticBackground() {
 
     let animationId: number;
     const animate = () => {
-      ctx.fillStyle = 'rgba(10, 10, 11, 0.1)';
+      ctx.fillStyle = colors.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Update and draw nodes
@@ -90,8 +103,8 @@ export default function FuturisticBackground() {
               node.x, node.y, 
               connectedNode.x, connectedNode.y
             );
-            gradient.addColorStop(0, `rgba(0, 212, 255, ${opacity * 0.5})`);
-            gradient.addColorStop(1, `rgba(102, 126, 234, ${opacity * 0.3})`);
+            gradient.addColorStop(0, `rgba(${colors.primary}, ${opacity * 0.5})`);
+            gradient.addColorStop(1, `rgba(${colors.secondary}, ${opacity * 0.3})`);
 
             ctx.strokeStyle = gradient;
             ctx.lineWidth = opacity;
@@ -107,8 +120,8 @@ export default function FuturisticBackground() {
           node.x, node.y, 0,
           node.x, node.y, 5
         );
-        gradient.addColorStop(0, 'rgba(0, 212, 255, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+        gradient.addColorStop(0, `rgba(${colors.primary}, 0.8)`);
+        gradient.addColorStop(1, `rgba(${colors.primary}, 0)`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -131,7 +144,7 @@ export default function FuturisticBackground() {
       window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationId);
     };
-  }, []);
+  }, [isDarkMode]);
 
   return (
     <canvas

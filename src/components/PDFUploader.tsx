@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Upload, FileText, AlertCircle, CheckCircle, Shield, Clock, Zap } from 'lucide-react';
 import { ErrorMessage, SuccessMessage } from './ErrorMessage';
 import { LoadingSpinner, ProgressBar } from './LoadingSpinner';
+import { addUserDocument, Document } from '@/lib/documentStorage';
 
 interface PDFUploaderProps {
   onUploadSuccess: (documentId: string) => void;
@@ -30,7 +31,7 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -157,12 +158,17 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
         setUploadProgress(100);
         setUploadPhase('complete');
         
-        // Store document metadata in localStorage
-        if (data.document) {
-          const storedDocs = localStorage.getItem('uploadedDocuments');
-          const documents = storedDocs ? JSON.parse(storedDocs) : [];
-          documents.push(data.document);
-          localStorage.setItem('uploadedDocuments', JSON.stringify(documents));
+        // Store document metadata in user-specific localStorage
+        if (data.document && user) {
+          const documentToStore: Document = {
+            id: data.document.id,
+            filename: data.document.filename,
+            uploadedAt: new Date(data.document.uploadedAt || data.document.uploadDate || Date.now()),
+            size: data.document.size || fileInfo?.size || 0,
+            type: 'application/pdf',
+            chunks: data.document.chunks
+          };
+          addUserDocument(documentToStore, user.id);
         }
         
         setTimeout(() => {
@@ -198,6 +204,19 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
         }
       }, 2000);
     }
+  };
+
+  // Don't show uploader if user is not authenticated
+  if (!user) {
+    return (
+      <div className="w-full max-w-md mx-auto text-center p-8">
+        <div className="card-futuristic p-6 border-red-500/20">
+          <Shield className="h-12 w-12 mx-auto mb-4 text-red-400" />
+          <p className="text-white font-medium mb-2">Authentication Required</p>
+          <p className="text-sm text-slate-400">Please sign in to upload documents</p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -261,7 +280,7 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
           ) : (
             <>
               <div className="relative mb-6">
-                <Upload className="mx-auto h-16 w-16 text-cyan-400 float group-hover:scale-110 transition-transform" />
+                <Upload className="mx-auto h-16 w-16 text-cyan-400 float group-hover:scale-[1.05] transition-transform duration-200" />
                 <div className="absolute inset-0 h-16 w-16 mx-auto rounded-full bg-cyan-400/20 blur-xl group-hover:bg-cyan-400/30"></div>
               </div>
               <p className="text-xl font-bold text-white mb-2 text-holographic">
@@ -282,7 +301,7 @@ export default function PDFUploader({ onUploadSuccess }: PDFUploaderProps) {
               
               <div className="mt-6 flex items-center justify-center text-xs text-slate-400">
                 <Shield className="h-3 w-3 mr-1 text-green-400" />
-                <span>Files are processed securely and not stored permanently</span>
+                <span>Your files are secure and private to your account</span>
               </div>
             </>
           )}

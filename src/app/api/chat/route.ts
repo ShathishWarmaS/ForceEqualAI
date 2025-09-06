@@ -7,6 +7,28 @@ import { chatSchema, sanitizeText, isValidUUID, formatValidationErrors } from '@
 import { QAResponse } from '@/types';
 import { z } from 'zod';
 
+// Advanced Q&A imports
+import { 
+  expandQuery, 
+  rerankContexts, 
+  generateReasonedAnswer, 
+  generateFollowUpQuestions,
+  detectMultiDocumentQuery,
+  calculateAnswerConfidence,
+  QueryAnalysis,
+  ContextChunk,
+  EnhancedAnswer
+} from '@/lib/advancedQA';
+import { 
+  performHybridSearch, 
+  aggregateMultiDocumentResults 
+} from '@/lib/enhancedSearch';
+import { 
+  AdaptiveRetrievalEngine,
+  AdaptiveRetrievalStrategy,
+  EnhancedContext
+} from '@/lib/adaptiveRAG';
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
@@ -58,50 +80,220 @@ export async function POST(request: NextRequest) {
     // Additional sanitization
     const sanitizedQuestion = sanitizeText(question);
     
-    console.log('🔍 Question:', sanitizedQuestion.substring(0, 100) + '...');
+    console.log('🔍 Advanced Q&A Processing:', sanitizedQuestion.substring(0, 100) + '...');
     console.log('📄 Document ID:', documentId);
+
+    // 🚀 ADAPTIVE RAG 2025 PIPELINE 🚀
+    console.log('🎯 Initializing Adaptive RAG Engine...');
     
-    // Generate embedding for the question
-    const questionEmbedding = await generateEmbedding(sanitizedQuestion);
-    console.log('🧠 Generated question embedding, length:', questionEmbedding.length);
+    // Step 1: Initialize Adaptive RAG Engine
+    const adaptiveEngine = new AdaptiveRetrievalEngine(user.userId);
     
-    // Check available documents
-    const availableDocs = await vectorStore.getAllDocuments();
-    console.log('📚 Available documents:', availableDocs);
+    // Step 2: Query Analysis and Expansion
+    const queryAnalysis: QueryAnalysis = await expandQuery(sanitizedQuestion);
+    console.log('🧠 Query Analysis:', {
+      intent: queryAnalysis.intent,
+      entities: queryAnalysis.entities.slice(0, 3),
+      confidence: queryAnalysis.confidence
+    });
+
+    // Step 3: Adaptive Strategy Selection (AI-driven strategy selection)
+    const retrievalStrategy: AdaptiveRetrievalStrategy = await adaptiveEngine.selectRetrievalStrategy(queryAnalysis);
+    console.log('🔄 Selected Strategy:', {
+      strategy: retrievalStrategy.strategy,
+      confidence: retrievalStrategy.confidence,
+      reasoning: retrievalStrategy.reasoning.substring(0, 100) + '...'
+    });
+
+    let enhancedContexts: EnhancedContext[] = [];
+    let enhancedAnswer: EnhancedAnswer;
     
-    // Find similar chunks from the document
-    const similarChunks = await vectorStore.searchSimilar(
-      questionEmbedding, 
-      documentId, 
-      5 // Top 5 most similar chunks
-    );
-    
-    console.log('🔎 Found similar chunks:', similarChunks.length);
-    
-    if (similarChunks.length === 0) {
-      console.log('❌ No chunks found for document:', documentId);
-      return NextResponse.json({
-        answer: 'No relevant information found in the document.',
-        sources: [],
-        confidence: 0
-      } as QAResponse);
+    if (documentId || detectMultiDocumentQuery(sanitizedQuestion)) {
+      // Advanced document-based Q&A with adaptive strategies
+      
+      console.log('📚 Document-based adaptive retrieval activated');
+      
+      // Step 4: Strategy-specific retrieval execution
+      switch (retrievalStrategy.strategy) {
+        case 'multi_stage':
+          enhancedContexts = await adaptiveEngine.performMultiStageRetrieval(
+            queryAnalysis, 
+            retrievalStrategy, 
+            user.userId
+          );
+          break;
+          
+        case 'knowledge_graph':
+          enhancedContexts = await adaptiveEngine.performKnowledgeGraphRetrieval(
+            queryAnalysis,
+            retrievalStrategy,
+            user.userId
+          );
+          break;
+          
+        case 'multimodal':
+          enhancedContexts = await adaptiveEngine.performMultimodalRetrieval(
+            queryAnalysis,
+            user.userId
+          );
+          break;
+          
+        case 'expert_domain':
+          // Domain-specialized retrieval with enhanced metadata
+          enhancedContexts = await adaptiveEngine.performMultiStageRetrieval(
+            queryAnalysis,
+            { ...retrievalStrategy, parameters: { ...retrievalStrategy.parameters, stages: 4 } },
+            user.userId
+          );
+          break;
+          
+        default: // 'simple'
+          // Fallback to hybrid search with enhancements
+          const searchResult = await performHybridSearch({
+            query: sanitizedQuestion,
+            queryAnalysis,
+            userId: user.userId,
+            documentIds: documentId ? [documentId] : undefined,
+            topK: 8,
+            diversityThreshold: 0.7
+          });
+          
+          // Convert to enhanced contexts
+          enhancedContexts = searchResult.chunks.map(chunk => ({
+            ...chunk,
+            metadata: {
+              documentType: 'text' as const,
+              trustworthiness: 0.8,
+              recency: 30,
+              authority: 0.7,
+              complexity: 0.5,
+              relationships: [],
+              semanticTags: [],
+              extractedEntities: []
+            }
+          }));
+          break;
+      }
+      
+      console.log('🔍 Enhanced Contexts Retrieved:', {
+        count: enhancedContexts.length,
+        avgTrustworth: enhancedContexts.reduce((sum, ctx) => sum + ctx.metadata.trustworthiness, 0) / enhancedContexts.length,
+        strategy: retrievalStrategy.strategy
+      });
+      
+      if (enhancedContexts.length === 0) {
+        console.log('❌ No relevant content found with adaptive retrieval');
+        return NextResponse.json({
+          answer: 'No relevant information found in the document(s) despite using advanced retrieval techniques.',
+          sources: [],
+          confidence: 0,
+          relatedQuestions: [],
+          reasoning: 'Advanced adaptive retrieval found no matching content',
+          retrievalStrategy: retrievalStrategy.strategy
+        });
+      }
+
+      // Step 5: Query and Prompt Enhancement with Compression
+      const enhancedPrompt = await adaptiveEngine.enhanceAndCompressPrompt(
+        enhancedContexts,
+        queryAnalysis,
+        conversationHistory
+      );
+
+      // Step 6: Advanced Answer Generation with Enhanced Context
+      const contextChunks: ContextChunk[] = enhancedContexts.map(ctx => ({
+        text: ctx.text,
+        score: ctx.score,
+        documentId: ctx.documentId,
+        chunkIndex: ctx.chunkIndex,
+        metadata: ctx.metadata
+      }));
+
+      enhancedAnswer = await generateReasonedAnswer(
+        queryAnalysis,
+        contextChunks,
+        conversationHistory
+      );
+
+      // Step 7: Advanced Confidence Calculation with Metadata
+      const metadataConfidence = enhancedContexts.reduce((sum, ctx) => 
+        sum + (ctx.metadata.trustworthiness * ctx.metadata.authority * ctx.score), 0
+      ) / enhancedContexts.length;
+      
+      const finalConfidence = Math.max(
+        enhancedAnswer.confidence,
+        calculateAnswerConfidence(queryAnalysis, contextChunks, enhancedAnswer.answer.length),
+        metadataConfidence
+      );
+
+      enhancedAnswer.confidence = Math.min(finalConfidence, 1.0);
+      enhancedAnswer.chunks = contextChunks;
+
+      // Add retrieval strategy info to reasoning
+      enhancedAnswer.reasoning += ` [Strategy: ${retrievalStrategy.strategy}, Confidence: ${(retrievalStrategy.confidence * 100).toFixed(0)}%]`;
+
+      console.log('✨ Adaptive RAG Answer:', {
+        confidence: enhancedAnswer.confidence,
+        sources: enhancedAnswer.sources.length,
+        strategy: retrievalStrategy.strategy,
+        metadataEnhanced: true
+      });
+      
+    } else {
+      // General AI assistant mode with follow-up generation
+      console.log('🤖 General AI assistant mode (no document selected)');
+      
+      const basicAnswer = await generateAnswer(
+        sanitizedQuestion, 
+        'You are a helpful AI assistant. Answer based on your general knowledge.',
+        conversationHistory
+      );
+      
+      // Generate follow-up questions for general queries
+      const followUps = await generateFollowUpQuestions(
+        basicAnswer,
+        sanitizedQuestion,
+        []
+      );
+      
+      enhancedAnswer = {
+        answer: basicAnswer,
+        confidence: 0.7,
+        sources: ['General AI Knowledge'],
+        relatedQuestions: followUps,
+        reasoning: 'Generated using general AI knowledge without document context (Adaptive RAG disabled)',
+        chunks: []
+      };
     }
 
-    // Combine similar chunks as context
-    const context = similarChunks
-      .map(chunk => chunk.content)
-      .join('\n\n');
-    
-    // Generate answer using OpenAI with conversation history
-    const answer = await generateAnswer(sanitizedQuestion, context, conversationHistory);
-    
-    // Calculate confidence based on number of relevant chunks found
-    const confidence = Math.min(similarChunks.length / 3, 1.0);
-
-    const response: QAResponse = {
-      answer,
-      sources: similarChunks,
-      confidence
+    const response = {
+      answer: enhancedAnswer.answer,
+      sources: enhancedAnswer.chunks.map(chunk => ({
+        content: chunk.text,
+        relevanceScore: chunk.score,
+        documentId: chunk.documentId,
+        chunkIndex: chunk.chunkIndex,
+        // Enhanced metadata from Adaptive RAG
+        metadata: chunk.metadata || {},
+        trustworthiness: chunk.metadata?.trustworthiness || 0.8,
+        authority: chunk.metadata?.authority || 0.7
+      })),
+      confidence: enhancedAnswer.confidence,
+      relatedQuestions: enhancedAnswer.relatedQuestions,
+      reasoning: enhancedAnswer.reasoning,
+      queryAnalysis: {
+        intent: queryAnalysis.intent,
+        entities: queryAnalysis.entities,
+        expandedQuery: queryAnalysis.expandedQuery
+      },
+      // Adaptive RAG 2025 enhancements
+      adaptiveRAG: {
+        strategy: retrievalStrategy.strategy,
+        strategyConfidence: retrievalStrategy.confidence,
+        strategyReasoning: retrievalStrategy.reasoning,
+        enhancedMetadata: true,
+        version: '2025.1'
+      }
     };
 
     return NextResponse.json(response, { 

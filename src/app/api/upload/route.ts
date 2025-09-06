@@ -124,10 +124,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Generated ${chunks.length} chunks with embeddings`);
 
-    // Store in vector database
+    // Store in vector database with metadata
     console.log('💾 Storing in vector database...');
     const storeTime = Date.now();
-    await vectorStore.storeDocument(documentId, chunks);
+    const metadata = {
+      filename: file.name,
+      uploadDate: new Date(),
+      chunks: chunks.length,
+      fileSize: file.size,
+      processingTime: Date.now() - startTime
+    };
+    await vectorStore.storeDocument(documentId, chunks, metadata);
     console.log(`⏱️  Vector storage took: ${Date.now() - storeTime}ms`);
 
     const totalTime = Date.now() - startTime;

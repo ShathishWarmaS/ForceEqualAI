@@ -24,6 +24,10 @@ class PersistentVectorStore {
     return path.join(this.dataDir, `${documentId}.json`);
   }
   
+  private getMetadataPath(documentId: string): string {
+    return path.join(this.dataDir, `${documentId}-metadata.json`);
+  }
+  
   private loadFromDisk() {
     try {
       const files = fs.readdirSync(this.dataDir);
@@ -51,10 +55,25 @@ class PersistentVectorStore {
     }
   }
   
-  async storeDocument(documentId: string, chunks: DocumentChunk[]): Promise<void> {
+  async storeDocument(documentId: string, chunks: DocumentChunk[], metadata?: any): Promise<void> {
     this.documents.set(documentId, chunks);
     this.saveToDisk(documentId, chunks);
+    
+    // Save metadata if provided
+    if (metadata) {
+      this.saveMetadataToDisk(documentId, metadata);
+    }
+    
     console.log(`💾 Saved document ${documentId} with ${chunks.length} chunks to disk`);
+  }
+  
+  private saveMetadataToDisk(documentId: string, metadata: any) {
+    try {
+      const metadataPath = this.getMetadataPath(documentId);
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      console.error('Error saving metadata to disk:', error);
+    }
   }
   
   async searchSimilar(
@@ -83,9 +102,16 @@ class PersistentVectorStore {
   async deleteDocument(documentId: string): Promise<void> {
     this.documents.delete(documentId);
     try {
+      // Delete vector data file
       const filePath = this.getFilePath(documentId);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
+      }
+      
+      // Delete metadata file
+      const metadataPath = this.getMetadataPath(documentId);
+      if (fs.existsSync(metadataPath)) {
+        fs.unlinkSync(metadataPath);
       }
     } catch (error) {
       console.error('Error deleting from disk:', error);
@@ -94,6 +120,39 @@ class PersistentVectorStore {
   
   async getAllDocuments(): Promise<string[]> {
     return Array.from(this.documents.keys());
+  }
+
+  async getDocumentChunks(documentId: string): Promise<DocumentChunk[]> {
+    return this.documents.get(documentId) || [];
+  }
+  
+  async searchAcrossAllDocuments(
+    queryEmbedding: number[], 
+    topK: number = 10
+  ): Promise<Array<{documentId: string, chunk: DocumentChunk, similarity: number}>> {
+    const allResults: Array<{documentId: string, chunk: DocumentChunk, similarity: number}> = [];
+    
+    // Search through all documents
+    for (const [documentId, chunks] of this.documents.entries()) {
+      const similarities = chunks.map(chunk => ({
+        documentId,
+        chunk,
+        similarity: this.cosineSimilarity(queryEmbedding, chunk.embedding)
+      }));
+      
+      // Only include results above threshold
+      const relevantResults = similarities.filter(item => item.similarity > 0.3);
+      allResults.push(...relevantResults);
+    }
+    
+    // Sort by similarity and return top K
+    return allResults
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topK);
+  }
+  
+  getDocumentChunks(documentId: string): DocumentChunk[] | undefined {
+    return this.documents.get(documentId);
   }
   
   private cosineSimilarity(a: number[], b: number[]): number {

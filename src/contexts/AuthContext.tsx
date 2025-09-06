@@ -12,8 +12,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; validationErrors?: any[] }>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string; validationErrors?: any[] }>;
+  logout: () => Promise<void>;
   isLoading: boolean;
   sessionExpiry: number | null;
   isSessionValid: () => boolean;
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
+  const register = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string; validationErrors?: any[] }> => {
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -178,8 +178,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    clearSession();
+  const logout = async () => {
+    try {
+      // Call logout API to clear server-side cookie
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    } finally {
+      // Always clear client-side session regardless of API call result
+      clearSession();
+      
+      // Force page refresh to ensure complete logout
+      window.location.href = '/';
+    }
   };
 
   return (

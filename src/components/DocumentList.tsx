@@ -1,43 +1,46 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Trash2, MessageSquare, Clock, Shield } from 'lucide-react';
+import { FileText, Trash2, MessageSquare, Clock, Shield, Search, Filter } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserDocuments, saveUserDocuments, Document as DocumentType } from '@/lib/documentStorage';
 
-interface Document {
-  id: string;
-  filename: string;
-  uploadDate: Date;
-  chunks: number;
-}
+// Using Document interface from documentStorage
+type Document = DocumentType;
 
 interface DocumentListProps {
   currentDocumentId?: string;
   onDocumentSelect: (documentId: string) => void;
   onDocumentDelete?: (documentId: string) => void;
+  onGlobalSearch?: (query: string) => void;
 }
 
 export default function DocumentList({ 
   currentDocumentId, 
   onDocumentSelect, 
-  onDocumentDelete 
+  onDocumentDelete,
+  onGlobalSearch
 }: DocumentListProps) {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
 
-  // Load documents and listen for changes
+  // Load user-specific documents and listen for changes
   useEffect(() => {
     const loadDocuments = () => {
-      const storedDocs = localStorage.getItem('uploadedDocuments');
-      if (storedDocs) {
+      if (user) {
         try {
-          const docs = JSON.parse(storedDocs);
-          setDocuments(docs.map((doc: any) => ({
-            ...doc,
-            uploadDate: new Date(doc.uploadDate)
-          })));
+          const userDocs = getUserDocuments(user.id);
+          setDocuments(userDocs);
+          setFilteredDocuments(userDocs);
         } catch (error) {
-          console.error('Error loading documents:', error);
+          console.error('Error loading user documents:', error);
         }
+      } else {
+        setDocuments([]);
+        setFilteredDocuments([]);
       }
       setIsLoading(false);
     };
@@ -46,7 +49,7 @@ export default function DocumentList({
 
     // Listen for storage changes (when new documents are uploaded)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'uploadedDocuments') {
+      if (user && e.key === `uploadedDocuments_${user.id}`) {
         loadDocuments();
       }
     };
@@ -67,15 +70,41 @@ export default function DocumentList({
       window.removeEventListener('documentsUpdated', handleDocumentUpdate);
       clearInterval(interval);
     };
-  }, []);
+  }, [user]);
+
+  // Filter documents based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredDocuments(documents);
+    } else {
+      const filtered = documents.filter(doc =>
+        doc.filename.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredDocuments(filtered);
+    }
+  }, [documents, searchQuery]);
+
+  const handleGlobalSearch = () => {
+    if (searchQuery.trim() && onGlobalSearch) {
+      onGlobalSearch(searchQuery.trim());
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleGlobalSearch();
+    }
+  };
 
   const handleDelete = (documentId: string) => {
+    if (!user) return;
+    
     if (window.confirm('Are you sure you want to delete this document? This will remove all associated data.')) {
-      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      
-      // Update localStorage
       const updatedDocs = documents.filter(doc => doc.id !== documentId);
-      localStorage.setItem('uploadedDocuments', JSON.stringify(updatedDocs));
+      setDocuments(updatedDocs);
+      
+      // Update user-specific localStorage
+      saveUserDocuments(updatedDocs, user.id);
       
       // Call parent handler
       onDocumentDelete?.(documentId);
@@ -88,6 +117,19 @@ export default function DocumentList({
       minute: '2-digit' 
     });
   };
+
+  // Don't show anything if user is not authenticated
+  if (!user) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-8">
+        <div className="text-center text-slate-400">
+          <Shield className="h-12 w-12 mx-auto mb-4 text-slate-500" />
+          <p className="text-sm text-white mb-2">Please sign in to view your documents</p>
+          <p className="text-xs text-slate-400">Your documents are private and secure</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -113,13 +155,52 @@ export default function DocumentList({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-cyan-500/20">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-medium text-white">Your Documents</h3>
           <div className="flex items-center text-sm text-slate-400">
             <Shield className="h-4 w-4 mr-1 text-green-400" />
             {documents.length} document{documents.length !== 1 ? 's' : ''}
           </div>
         </div>
+        
+        {/* Search Bar */}
+        <div className="flex space-x-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Search documents..."
+              className="w-full pl-7 pr-3 py-2 text-xs rounded border border-slate-600 bg-slate-800/50 text-white placeholder-slate-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all"
+            />
+          </div>
+          {onGlobalSearch && (
+            <button
+              onClick={handleGlobalSearch}
+              disabled={!searchQuery.trim()}
+              className="px-3 py-2 text-xs bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title="Search content across all documents"
+            >
+              <Search className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        
+        {searchQuery && (
+          <div className="mt-2 text-xs text-slate-400">
+            {filteredDocuments.length === documents.length 
+              ? `Showing all ${documents.length} documents`
+              : `Found ${filteredDocuments.length} of ${documents.length} documents`
+            }
+            {onGlobalSearch && (
+              <span className="ml-2 text-cyan-400">
+                • Press Enter or click 🔍 to search content
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -132,12 +213,21 @@ export default function DocumentList({
             <p className="text-sm text-white">No documents uploaded yet</p>
             <p className="text-xs mt-1 text-slate-400">Upload a PDF to get started with AI Q&A</p>
           </div>
+        ) : filteredDocuments.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">
+            <div className="relative mb-4">
+              <Search className="h-12 w-12 mx-auto text-slate-500 float" />
+              <div className="absolute inset-0 h-12 w-12 mx-auto rounded-full bg-slate-500/20 blur-xl"></div>
+            </div>
+            <p className="text-sm text-white">No documents match your search</p>
+            <p className="text-xs mt-1 text-slate-400">Try a different search term or clear the search</p>
+          </div>
         ) : (
           <div className="space-y-2 p-2">
-            {documents.map((doc) => (
+            {filteredDocuments.map((doc) => (
               <div
                 key={doc.id}
-                className={`p-3 card-futuristic cursor-pointer transition-all duration-300 group hover:scale-105 ${
+                className={`p-3 card-futuristic cursor-pointer transition-all duration-200 group hover:scale-[1.01] ${
                   currentDocumentId === doc.id 
                     ? 'border-purple-500/50 bg-gradient-to-r from-purple-500/20 to-pink-500/20 shadow-lg shadow-purple-500/25' 
                     : 'hover:border-purple-500/30 hover:bg-white/5'
@@ -164,13 +254,15 @@ export default function DocumentList({
                       <div className="flex items-center space-x-4 mt-1 text-xs text-slate-400">
                         <div className="flex items-center">
                           <Clock className="h-3 w-3 mr-1" />
-                          {formatDate(doc.uploadDate)}
+                          {formatDate(doc.uploadedAt)}
                         </div>
                         
-                        <div className="flex items-center">
-                          <MessageSquare className="h-3 w-3 mr-1" />
-                          {doc.chunks} chunks
-                        </div>
+                        {doc.chunks && (
+                          <div className="flex items-center">
+                            <MessageSquare className="h-3 w-3 mr-1" />
+                            {doc.chunks} chunks
+                          </div>
+                        )}
                       </div>
                       
                       {currentDocumentId === doc.id && (

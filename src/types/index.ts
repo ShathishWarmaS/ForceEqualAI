@@ -27,8 +27,23 @@ export interface ChatMessage {
 
 export interface QAResponse {
   answer: string;
-  sources: DocumentChunk[];
+  sources: EnhancedDocumentChunk[];
   confidence: number;
+  relatedQuestions?: string[];
+  reasoning?: string;
+  queryAnalysis?: {
+    intent: string;
+    entities: string[];
+    expandedQuery: string;
+  };
+}
+
+export interface EnhancedDocumentChunk {
+  content: string;
+  relevanceScore: number;
+  documentId: string;
+  chunkIndex: number;
+  metadata?: any;
 }
 
 export interface UploadResponse {

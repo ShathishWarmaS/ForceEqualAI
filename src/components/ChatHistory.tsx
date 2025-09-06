@@ -66,12 +66,12 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-cyan-500/20">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Chat History</h2>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Chat History</h2>
           <button
             onClick={onNewChat}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="btn-futuristic text-sm px-3 py-2"
           >
             <Plus className="h-4 w-4 mr-1" />
             New Chat
@@ -80,13 +80,17 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
           <input
             type="text"
             placeholder="Search conversations..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 card-futuristic border border-cyan-500/30 rounded-md text-sm focus:outline-none focus:border-cyan-400 focus:shadow-lg focus:shadow-cyan-400/25"
+            style={{ 
+              background: 'var(--input-bg)', 
+              color: 'var(--text-primary)'
+            }}
           />
         </div>
       </div>
@@ -94,12 +98,12 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
       {/* Session List */}
       <div className="flex-1 overflow-y-auto">
         {filteredSessions.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p className="text-sm">
+          <div className="p-6 text-center">
+            <MessageSquare className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-secondary)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               {sessions.length === 0 ? 'No conversations yet' : 'No conversations match your search'}
             </p>
-            <p className="text-xs mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
               {sessions.length === 0 ? 'Start asking questions about your documents' : 'Try a different search term'}
             </p>
           </div>
@@ -108,7 +112,7 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
             {filteredSessions.map((session) => (
               <div
                 key={session.id}
-                className={`p-3 card-futuristic cursor-pointer transition-all duration-300 group hover:scale-105 ${
+                className={`p-3 card-futuristic cursor-pointer transition-all duration-200 group hover:scale-[1.02] ${
                   currentSession?.id === session.id 
                     ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 shadow-lg shadow-cyan-500/25' 
                     : 'hover:border-cyan-500/30 hover:bg-white/5'
@@ -127,28 +131,28 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
                           currentSession?.id === session.id ? 'text-cyan-400' : 'text-purple-400'
                         }`} />
                       </div>
-                      <h3 className="text-sm font-medium text-white truncate group-hover:text-cyan-400 transition-colors">
+                      <h3 className="text-sm font-medium truncate group-hover:text-cyan-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                         {session.title}
                       </h3>
                       {currentSession?.id === session.id && (
-                        <Sparkles className="h-3 w-3 text-cyan-400 animate-pulse" />
+                        <Sparkles className="h-3 w-3 text-cyan-400 opacity-75" />
                       )}
                     </div>
                     
                     {session.documentName && (
                       <div className="flex items-center space-x-1 mb-2">
-                        <FileText className="h-3 w-3 text-slate-400" />
-                        <span className="text-xs text-slate-400 truncate">
+                        <FileText className="h-3 w-3" style={{ color: 'var(--text-secondary)' }} />
+                        <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
                           {session.documentName}
                         </span>
                       </div>
                     )}
                     
-                    <p className="text-xs text-slate-300 mb-2 line-clamp-2">
+                    <p className="text-xs mb-2 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                       {getMessagePreview(session)}
                     </p>
                     
-                    <div className="flex items-center space-x-3 text-xs text-slate-500">
+                    <div className="flex items-center space-x-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
                       <div className="flex items-center">
                         <Clock className="h-3 w-3 mr-1" />
                         {formatDate(session.updatedAt)}
@@ -159,7 +163,8 @@ export default function ChatHistory({ onNewChat }: ChatHistoryProps) {
                   
                   <button
                     onClick={(e) => handleDeleteSession(session.id, e)}
-                    className="ml-2 p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    className="ml-2 p-1.5 rounded-md hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    style={{ color: 'var(--text-secondary)' }}
                     title="Delete conversation"
                   >
                     <Trash2 className="h-3 w-3" />

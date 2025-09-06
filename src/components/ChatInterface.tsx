@@ -47,15 +47,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
         session = createSession(documentId, documentName);
       }
 
-      // Add user message
-      addMessage({
-        role: 'user',
-        content: trimmedQuestion,
-        documentId,
-        documentName
-      });
-
-      // Get conversation history for context
+      // Get conversation history for context (before adding the new message)
       const conversationHistory = session.messages.map(msg => ({
         role: msg.role,
         content: msg.content
@@ -65,6 +57,14 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
       conversationHistory.push({
         role: 'user',
         content: trimmedQuestion
+      });
+
+      // Add user message to UI
+      addMessage({
+        role: 'user',
+        content: trimmedQuestion,
+        documentId,
+        documentName
       });
 
       // Call API with conversation history
@@ -83,7 +83,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
 
       const data = await response.json();
 
-      if (data.success) {
+      if (response.ok && data.answer) {
         // Add AI response
         addMessage({
           role: 'assistant',
@@ -158,7 +158,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
 
       const data = await response.json();
 
-      if (data.success) {
+      if (response.ok && data.answer) {
         // Update the message in place
         const updatedSession = {
           ...currentSession,
@@ -189,10 +189,10 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
               <div className="absolute inset-0 h-20 w-20 mx-auto rounded-full bg-cyan-400/20 blur-xl"></div>
               <Sparkles className="h-6 w-6 absolute -top-2 -right-2 text-purple-400 animate-pulse" />
             </div>
-            <h3 className="text-xl font-medium text-white mb-4 text-holographic">
+            <h3 className="text-xl font-medium mb-4 text-holographic" style={{ color: 'var(--text-primary)' }}>
               {documentName ? `Ask questions about ${documentName}` : 'Start a conversation'}
             </h3>
-            <p className="text-slate-400">
+            <p style={{ color: 'var(--text-secondary)' }}>
               {documentName 
                 ? 'I can help you understand and analyze the content of your document.' 
                 : 'Upload a document or ask me anything!'}
@@ -205,7 +205,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
                 message.role === 'user' 
                   ? 'bg-gradient-to-r from-blue-500 to-cyan-500 border-cyan-400/50 shadow-lg shadow-cyan-500/25' 
                   : 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-400/50 shadow-lg shadow-purple-500/25'
-              } transition-all duration-300 group-hover:scale-110`}>
+              } transition-all duration-200 group-hover:scale-[1.05]`}>
                 {message.role === 'user' ? (
                   <User className="h-5 w-5 text-white" />
                 ) : (
@@ -215,10 +215,10 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
               
               <div className="flex-1 space-y-3">
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-white">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {message.role === 'user' ? 'You' : 'AI Assistant'}
                   </span>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {message.timestamp.toLocaleTimeString([], { 
                       hour: '2-digit', 
                       minute: '2-digit' 
@@ -231,7 +231,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
                     ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/10' 
                     : 'border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10'
                 }`}>
-                  <p className="text-white whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  <p className="whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>{message.content}</p>
                 </div>
                 
                 {/* Message actions */}
@@ -277,7 +277,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
             </div>
             <div className="flex-1 space-y-3">
               <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-white">AI Assistant</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>AI Assistant</span>
                 <div className="typing-dots">
                   <span></span>
                   <span></span>
@@ -287,7 +287,7 @@ export default function ChatInterface({ documentId, documentName }: ChatInterfac
               <div className="card-futuristic border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4">
                 <div className="flex items-center space-x-3">
                   <LoadingSpinner size="sm" />
-                  <span className="text-sm text-slate-300">Processing your question...</span>
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Processing your question...</span>
                 </div>
               </div>
             </div>

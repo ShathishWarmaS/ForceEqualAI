@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateToken } from '@/lib/auth';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-
-// Simple in-memory user store for demo purposes
-const users = new Map();
+import { createUser, findUserByEmail } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,26 +20,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const emailLower = email.toLowerCase();
-    if (users.has(emailLower)) {
+    // Check if user already exists
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
         { status: 409 }
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = uuidv4();
-
-    const newUser = {
-      id: userId,
-      email: emailLower,
-      password: hashedPassword,
-      name,
-      createdAt: new Date(),
-    };
-
-    users.set(emailLower, newUser);
+    // Create new user in database
+    const newUser = await createUser(email, password, name);
+    if (!newUser) {
+      return NextResponse.json(
+        { error: 'Failed to create user' },
+        { status: 500 }
+      );
+    }
 
     const token = generateToken({
       userId: newUser.id,

@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateToken } from '@/lib/auth';
-import bcrypt from 'bcryptjs';
 import { authLimiter, getClientIdentifier } from '@/lib/rate-limiter';
 import { loginSchema, formatValidationErrors } from '@/lib/validation';
+import { verifyUserPassword } from '@/lib/database';
 import { z } from 'zod';
-
-// Simple in-memory user store for demo purposes
-// In production, use a proper database
-const users = new Map([
-  ['demo@example.com', {
-    id: '1',
-    email: 'demo@example.com',
-    password: '$2a$10$EHQFZMjcHsksLqmZv6RSl.LAwmuorMlXKeGUD9e10zn1CcmqXJKsa', // 'password123'
-    name: 'Demo User'
-  }]
-]);
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,20 +40,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Security: Log sanitized request (never log passwords)
+    console.log(`Login attempt for email: ${requestBody.email || 'unknown'}`);
+
     // Validate with Zod schema
     const validatedData = loginSchema.parse(requestBody);
     const { email, password } = validatedData;
 
-    const user = users.get(email.toLowerCase());
+    // Verify user credentials using secure database
+    const user = await verifyUserPassword(email, password);
     if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
