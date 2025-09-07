@@ -3,13 +3,26 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 
-interface Message {
+export interface Source {
+  id: string;
+  content: string;
+  page?: number;
+  score?: number;
+  title?: string;
+  type?: 'pdf' | 'doc' | 'txt' | 'unknown';
+}
+
+export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   documentId?: string;
   documentName?: string;
+  sources?: Source[];
+  confidence?: number;
+  relatedQuestions?: string[];
+  reasoning?: string;
 }
 
 interface ChatSession {
@@ -70,7 +83,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             updatedAt: new Date(session.updatedAt),
             messages: session.messages.map((msg: any) => ({
               ...msg,
-              timestamp: new Date(msg.timestamp)
+              id: msg.id || crypto.randomUUID(), // Ensure ID exists
+              timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date() // Ensure valid Date
             }))
           }));
           
@@ -127,7 +141,41 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const addMessage = (messageData: Omit<Message, 'id' | 'timestamp'>) => {
+    console.log('🔥 ChatContext.addMessage called:', {
+      role: messageData.role,
+      content: messageData.content.substring(0, 50) + '...',
+      hasCurrentSession: !!currentSession,
+      currentSessionId: currentSession?.id,
+      currentMessageCount: currentSession?.messages?.length || 0
+    });
+
     if (!currentSession) {
+      console.log('❌ No current session, creating new one...');
+      const newSession = createSession(messageData.documentId, messageData.documentName);
+      // Retry adding message with new session
+      const newMessage: Message = {
+        ...messageData,
+        id: crypto.randomUUID(),
+        timestamp: new Date()
+      };
+
+      const updatedSession = {
+        ...newSession,
+        messages: [newMessage],
+        updatedAt: new Date(),
+        title: messageData.role === 'user' ? generateChatTitle(messageData.content) : newSession.title
+      };
+
+      console.log('✅ Created new session with message:', {
+        sessionId: updatedSession.id,
+        messageCount: updatedSession.messages.length,
+        messageId: newMessage.id
+      });
+
+      setCurrentSession(updatedSession);
+      setSessions(prev => prev.map(session => 
+        session.id === updatedSession.id ? updatedSession : session
+      ));
       return;
     }
 
@@ -147,10 +195,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         : currentSession.title
     };
 
+    console.log('✅ Adding message to existing session:', {
+      sessionId: updatedSession.id,
+      previousMessageCount: currentSession.messages.length,
+      newMessageCount: updatedSession.messages.length,
+      messageId: newMessage.id,
+      messageRole: newMessage.role
+    });
+
     setCurrentSession(updatedSession);
     setSessions(prev => prev.map(session => 
       session.id === updatedSession.id ? updatedSession : session
     ));
+
+    console.log('🔄 ChatContext state updated');
   };
 
   const deleteSession = (sessionId: string) => {

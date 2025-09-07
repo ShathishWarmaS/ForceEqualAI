@@ -343,28 +343,49 @@ export default function Dashboard() {
             {/* Chat Header */}
             <div className="card-futuristic border-b border-cyan-500/20 px-6 py-4 backdrop-blur-xl">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">
-                    <span className="text-holographic">
-                      Chatting with {currentDocumentName}
-                    </span>
-                  </h2>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Ask questions about your document content
-                  </p>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">
+                        <span className="text-holographic">
+                          Chatting with {currentDocumentName}
+                        </span>
+                      </h2>
+                      <div className="flex items-center gap-4 mt-1">
+                        <p className="text-sm text-slate-400">
+                          Ask questions about your document content
+                        </p>
+                        {/* Context Switcher */}
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded-md border border-slate-700/50">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>Personal Workspace</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded-md border border-slate-700/50">
+                            <span>Doc: {currentDocumentName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* User Account Dropdown */}
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => setActiveView('upload')}
+                        className="btn-futuristic text-sm px-3 py-2"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload New PDF
+                      </button>
+                      <UserMenu />
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setActiveView('upload')}
-                  className="btn-futuristic"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload New PDF
-                </button>
               </div>
             </div>
             
             {/* Chat Interface */}
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col min-h-0">
               <ChatInterface 
                 documentId={currentDocumentId} 
                 documentName={currentDocumentName || undefined} 
@@ -383,15 +404,30 @@ export default function Dashboard() {
                       AI Q&A Assistant
                     </span>
                   </h2>
-                  <p className="text-sm text-slate-400 mt-1">
-                    No document selected
-                  </p>
+                  <div className="flex items-center gap-4 mt-1">
+                    <p className="text-sm text-slate-400">
+                      Upload documents to get started with AI-powered Q&A
+                    </p>
+                    {/* Context Switcher */}
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded-md border border-slate-700/50">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>Personal Workspace</span>
+                      </div>
+                      <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded-md border border-slate-700/50">
+                        <span>General Chat Mode</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+                
+                {/* User Account Dropdown */}
+                <UserMenu />
               </div>
             </div>
             
             {/* Chat Interface */}
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col min-h-0">
               <ChatInterface />
             </div>
           </div>
